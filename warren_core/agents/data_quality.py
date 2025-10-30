@@ -58,15 +58,58 @@ class DataQualityAgent:
         raise NotImplementedError("DQA analysis pipeline not yet implemented")
 
     def _calculate_roic(self, data: Dict[str, Any]) -> float:
-        """Calculate Return on Invested Capital"""
-        # TODO: NOPAT = Operating Income * (1 - Tax Rate)
-        # TODO: Invested Capital = Total Assets - Current Liabilities - Cash
-        raise NotImplementedError()
+        """
+        Calculate Return on Invested Capital
+
+        ROIC = NOPAT / Invested Capital
+        where:
+        - NOPAT = Operating Income * (1 - Tax Rate)
+        - Invested Capital = Total Assets - Current Liabilities - Cash
+        """
+        operating_income = data.get("operating_income", 0)
+        tax_rate = data.get("tax_rate", 0.25)  # Default 25%
+
+        # Calculate NOPAT
+        nopat = operating_income * (1 - tax_rate)
+
+        # Calculate Invested Capital
+        total_assets = data.get("total_assets", 0)
+        current_liabilities = data.get("current_liabilities", 0)
+        cash = data.get("cash", 0)
+
+        invested_capital = total_assets - current_liabilities - cash
+
+        # Handle edge cases
+        if invested_capital <= 0:
+            return 0.0
+
+        return nopat / invested_capital
 
     def _calculate_roe(self, data: Dict[str, Any]) -> float:
-        """Calculate Return on Equity"""
-        # TODO: Net Income / Average Shareholders' Equity
-        raise NotImplementedError()
+        """
+        Calculate Return on Equity
+
+        ROE = Net Income / Average Shareholders' Equity
+
+        Uses average of current and previous year equity if available,
+        otherwise uses current equity only.
+        """
+        net_income = data.get("net_income", 0)
+
+        current_equity = data.get("shareholders_equity", 0)
+        prev_equity = data.get("shareholders_equity_prev")
+
+        # Calculate average equity if previous year available
+        if prev_equity is not None and prev_equity > 0:
+            avg_equity = (current_equity + prev_equity) / 2
+        else:
+            avg_equity = current_equity
+
+        # Handle edge cases
+        if avg_equity <= 0:
+            return 0.0
+
+        return net_income / avg_equity
 
     def _compute_moat_score(self, data: Dict[str, Any]) -> int:
         """
