@@ -1,50 +1,40 @@
-.PHONY: help run think check report cancel
+.PHONY: help install test lint format analyze run-agent
 
 # Default target - show help
 help:
-	@echo "Sleepless Agent Makefile Commands:"
+	@echo "Warren AI - Buffett-style Investment Analysis Framework"
 	@echo ""
-	@echo "  make run                                    - Start the sleepless-agent daemon"
-	@echo "  make think TASK=\"description\"              - Submit a task"
-	@echo "  make think TASK=\"description\" PROJECT=\"name\" - Submit a task with project"
-	@echo "  make check                                  - Check system status"
-	@echo "  make report [ID=\"identifier\"]              - View reports"
-	@echo "  make cancel ID=\"identifier\"                - Cancel a task"
-	@echo "  make help                                   - Show this help message"
+	@echo "Available commands:"
+	@echo "  make install      - Install dependencies"
+	@echo "  make test         - Run all tests"
+	@echo "  make lint         - Run linting checks"
+	@echo "  make format       - Format code with black and isort"
+	@echo "  make analyze      - Analyze a stock (use: make analyze TICKER=AAPL)"
+	@echo "  make help         - Show this help message"
 
-# Run the sleepless-agent daemon
-run:
-	python -m sleepless_agent daemon
+# Install dependencies
+install:
+	pip install -e .
 
-# Submit a task (use: make think TASK="your task description" or make think TASK="your task" PROJECT="project-name")
-think:
-	@if [ -z "$(TASK)" ]; then \
-		echo "Usage: make think TASK=\"your task description\""; \
-		echo "       make think TASK=\"your task\" PROJECT=\"project-name\""; \
+# Run tests
+test:
+	pytest tests/ -v
+
+# Lint code
+lint:
+	ruff check .
+	mypy warren_core/
+
+# Format code
+format:
+	black warren_core/ tests/
+	isort warren_core/ tests/
+
+# Run stock analysis
+analyze:
+	@if [ -z "$(TICKER)" ]; then \
+		echo "Usage: make analyze TICKER=<symbol>"; \
+		echo "Example: make analyze TICKER=AAPL"; \
 		exit 1; \
 	fi
-	@if [ -n "$(PROJECT)" ]; then \
-		python -m sleepless_agent think "$(TASK)" -p "$(PROJECT)"; \
-	else \
-		python -m sleepless_agent think "$(TASK)"; \
-	fi
-
-# Check system status
-check:
-	python -m sleepless_agent check
-
-# View report (use: make report ID="identifier")
-report:
-	@if [ -z "$(ID)" ]; then \
-		python -m sleepless_agent report; \
-	else \
-		python -m sleepless_agent report "$(ID)"; \
-	fi
-
-# Cancel a task (use: make cancel ID="identifier")
-cancel:
-	@if [ -z "$(ID)" ]; then \
-		echo "Usage: make cancel ID=\"identifier\""; \
-		exit 1; \
-	fi
-	python -m sleepless_agent cancel "$(ID)"
+	python -m warren_core.orchestrator --ticker $(TICKER)

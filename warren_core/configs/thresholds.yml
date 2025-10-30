@@ -1,0 +1,46 @@
+# Warren AI - Quality & Valuation Thresholds
+# Based on Buffett's investment principles
+
+quality_metrics:
+  # Profitability thresholds
+  roic_min: 0.12  # 12% minimum ROIC
+  roe_min: 0.15   # 15% minimum ROE
+
+  # Margin stability (std deviation threshold)
+  margin_volatility_max: 0.20  # 20% max volatility
+
+  # Moat score (0-100 scale)
+  moat_score_min: 60  # Minimum moat score for consideration
+
+valuation:
+  # Margin of Safety thresholds
+  mos_buy_threshold: 0.50   # 50% MOS for strong buy
+  mos_watch_threshold: 0.30  # 30% MOS for watch list
+
+  # Growth rate assumptions (conservative)
+  default_growth_rate: 0.05  # 5% default perpetual growth
+  max_growth_rate: 0.15      # 15% max growth rate cap
+
+  # Discount rate
+  base_discount_rate: 0.10   # 10% base discount rate
+  risk_premium_range: [0.02, 0.05]  # 2-5% additional risk premium
+
+leverage:
+  # Debt metrics
+  net_debt_ebitda_max: 2.5   # Max 2.5x Net Debt/EBITDA
+  interest_coverage_min: 5.0  # Min 5x interest coverage
+
+data_quality:
+  # Red flags for earnings quality
+  beneish_m_threshold: -2.2   # Beneish M-score warning level
+  cfo_ni_ratio_min: 0.8       # CFO/Net Income minimum ratio
+
+portfolio:
+  # Position sizing
+  max_position_size: 0.25     # 25% max single position
+  max_sector_exposure: 0.40   # 40% max sector exposure
+  min_cash_reserve: 0.10      # 10% minimum cash reserve
+
+  # Diversification
+  min_positions: 8
+  max_positions: 20

@@ -1,0 +1,77 @@
+# Warren AI - Devil's Advocate Veto Rules
+# Automatic rejection criteria based on fundamental red flags
+
+veto_rules:
+  # Earnings Quality Red Flags
+  - name: "earnings_manipulation_risk"
+    severity: "A"
+    condition: "beneish_m_score > -2.2"
+    description: "High probability of earnings manipulation (Beneish M-score)"
+
+  - name: "poor_cash_conversion"
+    severity: "A"
+    condition: "cfo_ni_ratio < 0.5"
+    description: "Operating cash flow significantly below net income"
+
+  # Leverage and Solvency
+  - name: "excessive_leverage"
+    severity: "A"
+    condition: "net_debt_ebitda > 4.0"
+    description: "Dangerously high debt levels relative to earnings"
+
+  - name: "weak_interest_coverage"
+    severity: "A"
+    condition: "interest_coverage < 2.0"
+    description: "Insufficient earnings to cover interest payments"
+
+  # Business Quality
+  - name: "no_competitive_moat"
+    severity: "A"
+    condition: "moat_score < 40"
+    description: "Weak or non-existent competitive advantages"
+
+  - name: "inconsistent_profitability"
+    severity: "B"
+    condition: "negative_earnings_years > 2 (last 10y)"
+    description: "Multiple years of losses indicate unstable business"
+
+  # Valuation Concerns
+  - name: "no_margin_of_safety"
+    severity: "A"
+    condition: "mos < 0.10"
+    description: "Insufficient margin of safety (< 10%)"
+
+  - name: "negative_owner_earnings"
+    severity: "A"
+    condition: "owner_earnings < 0"
+    description: "Company consuming cash rather than generating it"
+
+  # Corporate Governance
+  - name: "excessive_share_dilution"
+    severity: "B"
+    condition: "share_dilution > 0.05 (annual avg over 5y)"
+    description: "Significant shareholder dilution (> 5% annually)"
+
+  - name: "restatement_history"
+    severity: "B"
+    condition: "financial_restatements > 0 (last 5y)"
+    description: "History of financial restatements raises red flags"
+
+stress_test_scenarios:
+  # Scenarios the DA must test
+  - name: "margin_compression"
+    adjustment: "operating_margin * 0.70"  # 30% margin decline
+
+  - name: "growth_slowdown"
+    adjustment: "growth_rate * 0.50"  # 50% growth reduction
+
+  - name: "capex_surge"
+    adjustment: "maintenance_capex * 1.50"  # 50% higher capex
+
+  - name: "multiple_contraction"
+    adjustment: "exit_multiple * 0.80"  # 20% lower exit multiple
+
+warning_levels:
+  A: "Automatic veto - reject investment"
+  B: "Strong warning - reduce position size by 50%"
+  C: "Moderate concern - monitor closely"
