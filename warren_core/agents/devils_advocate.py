@@ -82,9 +82,75 @@ class DevilsAdvocateAgent:
         Returns:
             (veto_triggered, reason)
         """
-        # TODO: Check each veto rule from config
-        # TODO: Return True and reason if any A-level trigger hits
+        veto_rules = self.config.get("veto_rules", [])
+
+        for rule in veto_rules:
+            # Only check A-level (automatic veto) rules
+            if rule.get("severity") != "A":
+                continue
+
+            condition = rule.get("condition", "")
+            description = rule.get("description", "")
+
+            # Evaluate condition
+            triggered = self._evaluate_condition(condition, dqa_output, va_output)
+
+            if triggered:
+                return True, description
+
         return False, None
+
+    def _evaluate_condition(
+        self,
+        condition: str,
+        dqa_output: Any,
+        va_output: Any
+    ) -> bool:
+        """
+        Evaluate a veto rule condition
+
+        Supported conditions:
+        - beneish_m_score > -2.2
+        - cfo_ni_ratio < 0.5
+        - moat_score < 40
+        - mos < 0.10
+        - owner_earnings < 0
+        """
+        # Parse condition: "metric operator value"
+        parts = condition.split()
+        if len(parts) != 3:
+            return False  # Invalid condition format
+
+        metric, operator, threshold_str = parts
+
+        try:
+            threshold = float(threshold_str)
+        except ValueError:
+            return False  # Invalid threshold
+
+        # Get metric value from outputs
+        if hasattr(dqa_output, metric):
+            value = getattr(dqa_output, metric)
+        elif hasattr(va_output, metric):
+            value = getattr(va_output, metric)
+        elif metric == "mos":  # Alias for margin_of_safety
+            value = getattr(va_output, "margin_of_safety", 0)
+        else:
+            return False  # Unknown metric
+
+        # Evaluate condition
+        if operator == ">":
+            return value > threshold
+        elif operator == "<":
+            return value < threshold
+        elif operator == ">=":
+            return value >= threshold
+        elif operator == "<=":
+            return value <= threshold
+        elif operator == "==":
+            return value == threshold
+        else:
+            return False  # Unknown operator
 
     def _generate_counterarguments(
         self,
