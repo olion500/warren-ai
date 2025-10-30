@@ -2,6 +2,16 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## ⚠️ IMPORTANT: Check TASKS.md First
+
+**Before starting any work**, always read `TASKS.md` to see:
+- ✅ What's already been completed (don't redo!)
+- 🚧 What's currently in progress
+- ⏳ What needs to be done next
+- 📊 Current test coverage and commit status
+
+The task list is kept up-to-date with implementation status, test results, and git commit references.
+
 ## Project Overview
 
 **Warren AI** is a Buffett-style investment analysis framework built on a 5-agent architecture. It analyzes stocks through multiple lenses with a mandatory Devil's Advocate agent that challenges every investment thesis.
@@ -183,14 +193,37 @@ warren-ai/
 
 ## Implementation Status
 
-**Current state**: Skeleton architecture complete, agents not yet implemented.
+**Last Updated**: 2025-10-31 | **Total Commits**: 5
 
-All agent methods raise `NotImplementedError`. Priority implementation order:
-1. **DQA**: Start with basic ROIC/ROE calculations
-2. **VA**: Implement Owner's Earnings and simple DCF
-3. **DA**: Critical - implement veto rules and stress tests first
-4. **PA**: Decision tree and basic position sizing
-5. **MAA**: Memo generation from agent outputs
+### ✅ Agent 1: Data Quality Agent (DQA) - COMPLETE
+- ✅ ROIC calculation (commit: `92dd8ee`)
+- ✅ ROE calculation (commit: `92dd8ee`)
+- ✅ Moat score algorithm (commit: `3a2caa5`)
+- ✅ Data integrity checks (commit: `858ebdb`)
+- ✅ Full analyze() pipeline (commit: `858ebdb`)
+- **Status**: Production-ready | 95% coverage | 17 tests passing
+
+### 🟡 Agent 2: Valuation Agent (VA) - PARTIAL
+- ✅ Owner's Earnings calculation (commit: `86b4f18`)
+- ✅ Margin of Safety (MOS) calculation (commit: `86b4f18`)
+- ⏳ DCF valuation (3 scenarios) - **IN PROGRESS**
+- ⏳ Sensitivity analysis
+- **Status**: Core metrics done | 9 tests passing | DCF needed
+
+### ⏳ Agent 3: Devil's Advocate (DA) - NOT STARTED
+- ⏳ Veto rule checks - **HIGH PRIORITY**
+- ⏳ Counter-argument generation
+- ⏳ Stress tests
+- **Status**: Critical path blocker
+
+### ⏳ Agent 4: Portfolio Agent (PA) - NOT STARTED
+- ⏳ Decision rules (BUY/WATCH/REJECT)
+- ⏳ Position sizing
+
+### ⏳ Agent 5: Memo & Audit Agent (MAA) - NOT STARTED
+- ⏳ Memo generation
+
+**See TASKS.md for detailed task breakdown and next steps.**
 
 ## Development Notes
 
