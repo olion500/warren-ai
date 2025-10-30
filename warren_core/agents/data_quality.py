@@ -5,6 +5,7 @@ Gathers and validates financial data, computes quality metrics
 
 from typing import Dict, Any, List
 from dataclasses import dataclass
+import statistics
 
 
 @dataclass
@@ -116,13 +117,73 @@ class DataQualityAgent:
         Compute competitive moat score (0-100)
 
         Factors:
-        - Pricing power (gross margin trends)
-        - ROIC persistence over 10 years
-        - Revenue growth stability
-        - Market share trends
+        - Pricing power (gross margin trends) - 35 points
+        - ROIC persistence - 35 points
+        - Revenue growth stability - 30 points
+
+        Each factor scores based on:
+        1. Absolute level (high is good)
+        2. Stability (low volatility is good)
         """
-        # TODO: Implement moat scoring algorithm
-        raise NotImplementedError()
+        score = 0
+
+        # Factor 1: Pricing Power (Gross Margin) - 35 points
+        gross_margins = data.get("gross_margin", [])
+        if gross_margins and len(gross_margins) >= 1:
+            avg_margin = statistics.mean(gross_margins)
+
+            # Level score (0-20): Scale 0-50% margin to 0-20 points
+            level_score = min(20, avg_margin * 40)
+
+            # Stability score (0-15): Lower std dev is better
+            if len(gross_margins) >= 2:
+                margin_volatility = statistics.stdev(gross_margins)
+                # 0% volatility = 15 points, 20%+ volatility = 0 points
+                stability_score = max(0, 15 - (margin_volatility * 75))
+            else:
+                stability_score = 7.5  # Half points for insufficient data
+
+            score += level_score + stability_score
+
+        # Factor 2: ROIC Persistence - 35 points
+        roic_history = data.get("roic_history", [])
+        if roic_history and len(roic_history) >= 1:
+            avg_roic = statistics.mean(roic_history)
+
+            # Level score (0-20): Scale 0-25% ROIC to 0-20 points
+            level_score = min(20, avg_roic * 80)
+
+            # Consistency score (0-15): Lower std dev is better
+            if len(roic_history) >= 2:
+                roic_volatility = statistics.stdev(roic_history)
+                # 0% volatility = 15 points, 10%+ volatility = 0 points
+                consistency_score = max(0, 15 - (roic_volatility * 150))
+            else:
+                consistency_score = 7.5
+
+            score += level_score + consistency_score
+
+        # Factor 3: Revenue Growth Stability - 30 points
+        revenue_growth = data.get("revenue_growth", [])
+        if revenue_growth and len(revenue_growth) >= 1:
+            avg_growth = statistics.mean(revenue_growth)
+
+            # Level score (0-15): Scale 0-15% growth to 0-15 points
+            # Negative growth scores 0
+            level_score = max(0, min(15, avg_growth * 100))
+
+            # Stability score (0-15): Lower volatility is better
+            if len(revenue_growth) >= 2:
+                growth_volatility = statistics.stdev(revenue_growth)
+                # 0% volatility = 15 points, 10%+ volatility = 0 points
+                stability_score = max(0, 15 - (growth_volatility * 150))
+            else:
+                stability_score = 7.5
+
+            score += level_score + stability_score
+
+        # Cap at 100
+        return min(100, int(round(score)))
 
     def _check_data_integrity(self, data: Dict[str, Any]) -> List[Dict[str, str]]:
         """

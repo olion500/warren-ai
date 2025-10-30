@@ -119,3 +119,69 @@ class TestROECalculation:
 
         roe = agent._calculate_roe(data)
         assert roe == pytest.approx(0.25, rel=0.01)  # Use current equity only
+
+
+class TestMoatScore:
+    """Test moat score calculation"""
+
+    def test_moat_score_strong_moat(self, config, sample_financial_data):
+        """Test moat score for company with strong competitive advantages"""
+        agent = DataQualityAgent(config)
+
+        # Strong moat characteristics:
+        # - Stable high gross margins
+        # - Consistent high ROIC
+        # - Stable revenue growth
+        data = sample_financial_data.copy()
+
+        moat_score = agent._compute_moat_score(data)
+
+        # Should be >= 60 (threshold for consideration)
+        assert moat_score >= 60
+        assert moat_score <= 100
+
+    def test_moat_score_weak_moat(self, config):
+        """Test moat score for company with weak competitive advantages"""
+        agent = DataQualityAgent(config)
+
+        data = {
+            "gross_margin": [0.10, 0.08, 0.12, 0.09, 0.11],  # Low, volatile
+            "roic_history": [0.05, 0.03, 0.06, 0.04, 0.05],  # Low ROIC
+            "revenue_growth": [0.02, -0.01, 0.03, 0.01, 0.02],  # Volatile growth
+        }
+
+        moat_score = agent._compute_moat_score(data)
+
+        # Should be < 60 (below consideration threshold)
+        assert moat_score < 60
+        assert moat_score >= 0
+
+    def test_moat_score_components(self, config):
+        """Test that moat score considers all components"""
+        agent = DataQualityAgent(config)
+
+        # Perfect on all dimensions
+        perfect_data = {
+            "gross_margin": [0.50, 0.50, 0.50, 0.50, 0.50],  # Stable high margin
+            "roic_history": [0.20, 0.20, 0.20, 0.20, 0.20],  # Consistent high ROIC
+            "revenue_growth": [0.10, 0.10, 0.10, 0.10, 0.10],  # Stable growth
+        }
+
+        score_perfect = agent._compute_moat_score(perfect_data)
+
+        # Near-perfect should score very high
+        assert score_perfect >= 85
+
+    def test_moat_score_missing_data(self, config):
+        """Test moat score with incomplete data"""
+        agent = DataQualityAgent(config)
+
+        data = {
+            "gross_margin": [0.40, 0.42],  # Only 2 years
+            "roic_history": [0.15],  # Only 1 year
+        }
+
+        moat_score = agent._compute_moat_score(data)
+
+        # Should still return a valid score (conservative estimate)
+        assert 0 <= moat_score <= 100
