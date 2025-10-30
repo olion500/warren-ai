@@ -185,3 +185,133 @@ class TestMoatScore:
 
         # Should still return a valid score (conservative estimate)
         assert 0 <= moat_score <= 100
+
+
+class TestDataIntegrity:
+    """Test data integrity checks"""
+
+    def test_data_integrity_clean_data(self, config, sample_financial_data):
+        """Test data integrity with clean financial data"""
+        agent = DataQualityAgent(config)
+
+        warnings = agent._check_data_integrity(sample_financial_data)
+
+        # Clean data should have no warnings
+        assert len(warnings) == 0
+
+    def test_data_integrity_beneish_warning(self, config):
+        """Test earnings manipulation warning (Beneish M-score)"""
+        agent = DataQualityAgent(config)
+
+        data = {
+            "ticker": "TEST",
+            "beneish_m_score": -1.5,  # > -2.2 threshold (bad)
+            "cfo": 8000000,
+            "net_income": 7500000,
+        }
+
+        warnings = agent._check_data_integrity(data)
+
+        # Should have A-level warning for earnings manipulation risk
+        assert len(warnings) > 0
+        assert any(w["severity"] == "A" for w in warnings)
+        assert any("earnings" in w["message"].lower() for w in warnings)
+
+    def test_data_integrity_cfo_ni_warning(self, config):
+        """Test poor cash conversion warning"""
+        agent = DataQualityAgent(config)
+
+        data = {
+            "ticker": "TEST",
+            "beneish_m_score": -2.5,  # Good
+            "cfo": 3000000,  # CFO
+            "net_income": 10000000,  # NI
+            # CFO/NI = 0.3 < 0.8 threshold
+        }
+
+        warnings = agent._check_data_integrity(data)
+
+        # Should have warning for poor cash conversion
+        assert len(warnings) > 0
+        assert any("cash" in w["message"].lower() for w in warnings)
+
+    def test_data_integrity_missing_fields(self, config):
+        """Test warnings for missing critical fields"""
+        agent = DataQualityAgent(config)
+
+        data = {
+            "ticker": "TEST",
+            # Missing many fields
+        }
+
+        warnings = agent._check_data_integrity(data)
+
+        # Should have warnings for missing data
+        assert len(warnings) > 0
+        assert any(w["severity"] in ["B", "C"] for w in warnings)
+
+    def test_data_integrity_multiple_issues(self, config):
+        """Test handling of multiple data quality issues"""
+        agent = DataQualityAgent(config)
+
+        data = {
+            "ticker": "TEST",
+            "beneish_m_score": -1.0,  # Bad (> -2.2)
+            "cfo": 2000000,
+            "net_income": 10000000,  # Bad ratio
+            # Missing other fields
+        }
+
+        warnings = agent._check_data_integrity(data)
+
+        # Should have multiple warnings
+        assert len(warnings) >= 2
+
+
+class TestDQAIntegration:
+    """Test full DQA analysis pipeline"""
+
+    def test_full_analysis(self, config, sample_financial_data):
+        """Test complete DQA analysis pipeline"""
+        agent = DataQualityAgent(config)
+
+        result = agent.analyze("TEST", sample_financial_data)
+
+        # Verify all outputs are present
+        assert result.ticker == "TEST"
+        assert result.roic > 0
+        assert result.roe > 0
+        assert result.moat_score >= 0
+        assert result.moat_score <= 100
+        assert result.beneish_m_score < -2.2  # Good
+        assert result.cfo_ni_ratio > 0.8  # Good
+        assert len(result.data_warnings) == 0  # Clean data
+
+    def test_analysis_with_warnings(self, config):
+        """Test DQA analysis with problematic data"""
+        agent = DataQualityAgent(config)
+
+        bad_data = {
+            "ticker": "BAD",
+            "operating_income": 5000000,
+            "tax_rate": 0.25,
+            "total_assets": 20000000,
+            "current_liabilities": 5000000,
+            "cash": 2000000,
+            "net_income": 10000000,
+            "shareholders_equity": 15000000,
+            "gross_margin": [0.20, 0.18, 0.22],
+            "roic_history": [0.08, 0.07, 0.09],
+            "revenue_growth": [0.03, -0.01, 0.02],
+            "cfo": 3000000,  # Poor cash conversion
+            "beneish_m_score": -1.5,  # Manipulation risk
+        }
+
+        result = agent.analyze("BAD", bad_data)
+
+        # Should have warnings
+        assert len(result.data_warnings) > 0
+        # Should have lower moat score
+        assert result.moat_score < 60
+        # Should flag cash quality issues
+        assert any(w["severity"] == "A" for w in result.data_warnings)

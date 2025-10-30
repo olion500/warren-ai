@@ -48,15 +48,40 @@ class DataQualityAgent:
         Returns:
             DataQualityOutput with metrics and warnings
         """
-        # TODO: Implement data gathering and validation
-        # TODO: Calculate ROIC = NOPAT / Invested Capital
-        # TODO: Calculate ROE = Net Income / Shareholders' Equity
-        # TODO: Assess margin volatility over time
-        # TODO: Compute moat score (pricing power, returns, growth stability)
-        # TODO: Calculate Beneish M-score for earnings quality
-        # TODO: Check CFO/NI ratio
+        # Calculate profitability metrics
+        roic = self._calculate_roic(financial_data)
+        roe = self._calculate_roe(financial_data)
 
-        raise NotImplementedError("DQA analysis pipeline not yet implemented")
+        # Assess margin stability
+        gross_margins = financial_data.get("gross_margin", [])
+        if gross_margins and len(gross_margins) >= 2:
+            margin_stability = statistics.stdev(gross_margins)
+        else:
+            margin_stability = 0.0
+
+        # Compute competitive moat score
+        moat_score = self._compute_moat_score(financial_data)
+
+        # Get earnings quality metrics
+        beneish_m_score = financial_data.get("beneish_m_score", -3.0)  # Default good
+
+        cfo = financial_data.get("cfo", 0)
+        net_income = financial_data.get("net_income", 1)
+        cfo_ni_ratio = cfo / net_income if net_income > 0 else 0.0
+
+        # Check data integrity
+        data_warnings = self._check_data_integrity(financial_data)
+
+        return DataQualityOutput(
+            ticker=ticker,
+            roic=roic,
+            roe=roe,
+            margin_stability=margin_stability,
+            moat_score=moat_score,
+            data_warnings=data_warnings,
+            beneish_m_score=beneish_m_score,
+            cfo_ni_ratio=cfo_ni_ratio
+        )
 
     def _calculate_roic(self, data: Dict[str, Any]) -> float:
         """
@@ -189,10 +214,67 @@ class DataQualityAgent:
         """
         Check for data quality issues
 
-        Returns list of warnings with severity (A/B/C)
+        Returns list of warnings with severity (A/B/C):
+        - A: Critical issues (auto-reject candidates)
+        - B: Significant concerns (reduce position size)
+        - C: Minor issues (monitor closely)
         """
         warnings = []
-        # TODO: Check for missing data
-        # TODO: Check for restatements
-        # TODO: Validate consistency across periods
+
+        # Check 1: Beneish M-score (earnings manipulation risk)
+        beneish_m = data.get("beneish_m_score")
+        if beneish_m is not None and beneish_m > -2.2:
+            warnings.append({
+                "severity": "A",
+                "category": "earnings_quality",
+                "message": f"High earnings manipulation risk (Beneish M-score: {beneish_m:.2f} > -2.2)"
+            })
+
+        # Check 2: CFO/NI ratio (cash conversion quality)
+        cfo = data.get("cfo")
+        net_income = data.get("net_income")
+
+        if cfo is not None and net_income is not None and net_income > 0:
+            cfo_ni_ratio = cfo / net_income
+
+            if cfo_ni_ratio < 0.5:
+                warnings.append({
+                    "severity": "A",
+                    "category": "cash_quality",
+                    "message": f"Poor cash conversion (CFO/NI: {cfo_ni_ratio:.2f} < 0.5)"
+                })
+            elif cfo_ni_ratio < 0.8:
+                warnings.append({
+                    "severity": "B",
+                    "category": "cash_quality",
+                    "message": f"Weak cash conversion (CFO/NI: {cfo_ni_ratio:.2f} < 0.8)"
+                })
+
+        # Check 3: Missing critical fields
+        critical_fields = [
+            "operating_income", "net_income", "total_assets",
+            "shareholders_equity", "cfo"
+        ]
+
+        missing_fields = [
+            field for field in critical_fields
+            if data.get(field) is None
+        ]
+
+        if missing_fields:
+            warnings.append({
+                "severity": "B" if len(missing_fields) <= 2 else "C",
+                "category": "missing_data",
+                "message": f"Missing critical fields: {', '.join(missing_fields)}"
+            })
+
+        # Check 4: Negative equity (balance sheet issue)
+        equity = data.get("shareholders_equity")
+        if equity is not None and equity < 0:
+            warnings.append({
+                "severity": "A",
+                "category": "balance_sheet",
+                "message": "Negative shareholders' equity (balance sheet distress)"
+            })
+
         return warnings
