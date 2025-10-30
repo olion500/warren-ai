@@ -65,11 +65,26 @@ class ValuationAgent:
         Calculate Owner's Earnings (Buffett formula)
 
         Owner's Earnings = Operating Cash Flow - Maintenance CapEx
+
+        Maintenance CapEx is estimated as:
+        - If growth_capex_ratio provided: total_capex * (1 - growth_capex_ratio)
+        - Otherwise: Conservative estimate of 30% of CFO
         """
-        # TODO: Get CFO from cash flow statement
-        # TODO: Estimate maintenance CapEx (vs growth CapEx)
-        # TODO: Adjust for one-time items
-        raise NotImplementedError()
+        cfo = data.get("cfo", 0)
+        total_capex = data.get("total_capex", 0)
+        growth_capex_ratio = data.get("growth_capex_ratio")
+
+        if total_capex > 0 and growth_capex_ratio is not None:
+            # Calculate maintenance capex from split
+            maintenance_capex = total_capex * (1 - growth_capex_ratio)
+        elif total_capex > 0:
+            # Conservative: assume 50% is maintenance if not specified
+            maintenance_capex = total_capex * 0.5
+        else:
+            # Very conservative: estimate 30% of CFO as maintenance capex
+            maintenance_capex = cfo * 0.30
+
+        return cfo - maintenance_capex
 
     def _run_dcf(
         self,
