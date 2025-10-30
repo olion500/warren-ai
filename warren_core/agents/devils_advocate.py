@@ -162,21 +162,107 @@ class DevilsAdvocateAgent:
         Generate specific counter-arguments to the bull case
 
         Categories:
-        - Business model vulnerabilities
+        - Profitability concerns
         - Competitive threats
-        - Cyclicality and macro sensitivity
-        - Management concerns
-        - Valuation optimism
-        - Hidden liabilities
+        - Valuation concerns
+        - Cash quality concerns
+        - Business stability concerns
         """
         arguments = []
 
-        # TODO: Analyze business model risks
-        # TODO: Check for competitive threats
-        # TODO: Assess cyclicality
-        # TODO: Review management track record
-        # TODO: Challenge valuation assumptions
-        # TODO: Look for off-balance-sheet risks
+        # 1. Profitability Concerns
+        if dqa_output.roic < 0.12:  # Below 12% threshold
+            severity = "B" if dqa_output.roic >= 0.08 else "A"
+            arguments.append(CounterArgument(
+                severity=severity,
+                category="profitability",
+                claim=f"Below-average ROIC ({dqa_output.roic:.1%}) indicates weak capital efficiency",
+                evidence=f"ROIC of {dqa_output.roic:.1%} is below the 12% quality threshold, suggesting the company struggles to generate returns on invested capital",
+                impact="Lower ROIC reduces intrinsic value and indicates potential competitive disadvantages or capital allocation issues"
+            ))
+
+        if dqa_output.roe < 0.15:  # Below 15% threshold
+            severity = "B" if dqa_output.roe >= 0.10 else "A"
+            arguments.append(CounterArgument(
+                severity=severity,
+                category="profitability",
+                claim=f"Subpar ROE ({dqa_output.roe:.1%}) suggests inefficient use of shareholder equity",
+                evidence=f"ROE of {dqa_output.roe:.1%} falls short of the 15% quality threshold",
+                impact="Mediocre returns on equity may indicate management inefficiency or structural business challenges"
+            ))
+
+        # 2. Competitive Moat Concerns
+        if dqa_output.moat_score < 60:
+            if dqa_output.moat_score < 40:
+                severity = "A"
+                claim = f"No durable competitive advantage (moat score: {dqa_output.moat_score}/100)"
+                impact = "Without a moat, the company is vulnerable to competition and unlikely to sustain above-average returns"
+            else:
+                severity = "B"
+                claim = f"Weak competitive moat (moat score: {dqa_output.moat_score}/100)"
+                impact = "Marginal competitive advantages may erode under competitive pressure or market changes"
+
+            arguments.append(CounterArgument(
+                severity=severity,
+                category="competitive_moat",
+                claim=claim,
+                evidence=f"Moat score of {dqa_output.moat_score}/100 indicates limited pricing power, inconsistent ROIC, or unstable growth",
+                impact=impact
+            ))
+
+        # 3. Valuation Concerns
+        if va_output.margin_of_safety < 0.30:  # Below 30% watch threshold
+            if va_output.margin_of_safety < 0.10:
+                severity = "A"
+                claim = f"Minimal margin of safety ({va_output.margin_of_safety:.0%}) provides no downside protection"
+            elif va_output.margin_of_safety < 0.20:
+                severity = "B"
+                claim = f"Thin margin of safety ({va_output.margin_of_safety:.0%}) offers limited downside protection"
+            else:
+                severity = "C"
+                claim = f"Modest margin of safety ({va_output.margin_of_safety:.0%}) leaves little room for error"
+
+            arguments.append(CounterArgument(
+                severity=severity,
+                category="valuation",
+                claim=claim,
+                evidence=f"At {va_output.margin_of_safety:.0%} MOS, current price is {100 - va_output.margin_of_safety * 100:.0f}% of intrinsic value",
+                impact="Limited margin of safety increases risk if growth disappoints or assumptions prove optimistic"
+            ))
+
+        # 4. Cash Quality Concerns
+        if dqa_output.cfo_ni_ratio < 0.8:  # Below threshold (already checked in veto for < 0.5)
+            if dqa_output.cfo_ni_ratio >= 0.5:
+                severity = "B"
+                arguments.append(CounterArgument(
+                    severity=severity,
+                    category="cash_quality",
+                    claim=f"Weak cash conversion (CFO/NI: {dqa_output.cfo_ni_ratio:.2f}) raises earnings quality concerns",
+                    evidence=f"Operating cash flow of {dqa_output.cfo_ni_ratio:.2f}x net income suggests potential accounting aggressiveness",
+                    impact="Lower cash conversion may indicate earnings quality issues or working capital deterioration"
+                ))
+
+        # 5. Margin Stability Concerns
+        if dqa_output.margin_stability > 0.10:  # High volatility
+            severity = "B" if dqa_output.margin_stability < 0.15 else "A"
+            arguments.append(CounterArgument(
+                severity=severity,
+                category="business_stability",
+                claim=f"High margin volatility ({dqa_output.margin_stability:.1%} std dev) indicates business instability",
+                evidence=f"Gross margin standard deviation of {dqa_output.margin_stability:.1%} suggests inconsistent pricing power or cost control",
+                impact="Margin instability makes future cash flows unpredictable and increases valuation uncertainty"
+            ))
+
+        # 6. Data Quality Red Flags
+        for warning in dqa_output.data_warnings:
+            if warning["severity"] in ["A", "B"]:
+                arguments.append(CounterArgument(
+                    severity=warning["severity"],
+                    category="data_quality",
+                    claim=f"Data quality issue: {warning['category']}",
+                    evidence=warning["message"],
+                    impact="Data integrity concerns undermine confidence in financial analysis"
+                ))
 
         return arguments
 

@@ -238,3 +238,157 @@ class TestVetoRuleChecks:
         assert reason is not None
         # Should mention at least one of the issues
         assert len(reason) > 10
+
+
+class TestCounterArguments:
+    """Test counter-argument generation"""
+
+    def test_strong_company_minimal_concerns(self, config, clean_dqa_output, clean_va_output):
+        """Test that strong company gets minimal counter-arguments"""
+        agent = DevilsAdvocateAgent(config)
+
+        arguments = agent._generate_counterarguments("GOOD", clean_dqa_output, clean_va_output)
+
+        # Strong company should have few or no serious concerns
+        # May have some C-level monitoring points
+        a_level = [arg for arg in arguments if arg.severity == "A"]
+        b_level = [arg for arg in arguments if arg.severity == "B"]
+
+        assert len(a_level) == 0  # No critical issues
+        assert len(b_level) <= 1  # At most 1 significant concern
+
+    def test_weak_profitability_concern(self, config, clean_va_output):
+        """Test counter-argument for weak profitability"""
+        agent = DevilsAdvocateAgent(config)
+
+        weak_dqa = DataQualityOutput(
+            ticker="WEAK",
+            roic=0.08,  # Below 12% threshold
+            roe=0.10,  # Below 15% threshold
+            margin_stability=0.05,
+            moat_score=65,  # Good moat
+            data_warnings=[],
+            beneish_m_score=-2.5,
+            cfo_ni_ratio=1.0
+        )
+
+        arguments = agent._generate_counterarguments("WEAK", weak_dqa, clean_va_output)
+
+        # Should have concern about profitability
+        assert len(arguments) > 0
+        profitability_args = [
+            arg for arg in arguments
+            if "roic" in arg.claim.lower() or "roe" in arg.claim.lower() or "profitability" in arg.claim.lower()
+        ]
+        assert len(profitability_args) > 0
+        # Should be at least B-level concern
+        assert any(arg.severity in ["A", "B"] for arg in profitability_args)
+
+    def test_weak_moat_competitive_threat(self, config, clean_va_output):
+        """Test counter-argument for weak competitive moat"""
+        agent = DevilsAdvocateAgent(config)
+
+        weak_moat_dqa = DataQualityOutput(
+            ticker="NOMOAT",
+            roic=0.15,
+            roe=0.20,
+            margin_stability=0.05,
+            moat_score=45,  # Weak moat (40-60 range)
+            data_warnings=[],
+            beneish_m_score=-2.5,
+            cfo_ni_ratio=1.0
+        )
+
+        arguments = agent._generate_counterarguments("NOMOAT", weak_moat_dqa, clean_va_output)
+
+        # Should have concern about competitive advantage
+        assert len(arguments) > 0
+        moat_args = [
+            arg for arg in arguments
+            if "moat" in arg.claim.lower() or "competitive" in arg.claim.lower()
+        ]
+        assert len(moat_args) > 0
+        assert any(arg.severity in ["A", "B"] for arg in moat_args)
+
+    def test_low_mos_valuation_concern(self, config, clean_dqa_output):
+        """Test counter-argument for low margin of safety"""
+        agent = DevilsAdvocateAgent(config)
+
+        low_mos_va = ValuationOutput(
+            ticker="PRICEY",
+            owner_earnings=10000000,
+            intrinsic_value_base=120,
+            intrinsic_value_low=100,
+            intrinsic_value_high=140,
+            current_price=100,
+            margin_of_safety=0.17,  # Only 17% MOS (below 30% watch threshold)
+            dcf_assumptions={}
+        )
+
+        arguments = agent._generate_counterarguments("PRICEY", clean_dqa_output, low_mos_va)
+
+        # Should have valuation concern
+        assert len(arguments) > 0
+        valuation_args = [
+            arg for arg in arguments
+            if "valuation" in arg.claim.lower() or "margin of safety" in arg.claim.lower() or "price" in arg.claim.lower()
+        ]
+        assert len(valuation_args) > 0
+
+    def test_multiple_issues_multiple_arguments(self, config):
+        """Test multiple counter-arguments for problematic company"""
+        agent = DevilsAdvocateAgent(config)
+
+        bad_dqa = DataQualityOutput(
+            ticker="BAD",
+            roic=0.07,  # Low
+            roe=0.09,  # Low
+            margin_stability=0.15,  # High volatility
+            moat_score=48,  # Weak
+            data_warnings=[{"severity": "B", "category": "test", "message": "test"}],
+            beneish_m_score=-2.3,  # Close to threshold
+            cfo_ni_ratio=0.75  # Weak cash conversion
+        )
+
+        bad_va = ValuationOutput(
+            ticker="BAD",
+            owner_earnings=5000000,
+            intrinsic_value_base=110,
+            intrinsic_value_low=90,
+            intrinsic_value_high=130,
+            current_price=100,
+            margin_of_safety=0.09,  # Very low
+            dcf_assumptions={}
+        )
+
+        arguments = agent._generate_counterarguments("BAD", bad_dqa, bad_va)
+
+        # Should have multiple concerns
+        assert len(arguments) >= 3
+
+        # Should cover multiple categories
+        categories = {arg.category for arg in arguments}
+        assert len(categories) >= 2
+
+        # Should have mix of severities
+        severities = {arg.severity for arg in arguments}
+        assert "B" in severities or "A" in severities
+
+    def test_counter_argument_structure(self, config, clean_dqa_output, clean_va_output):
+        """Test that counter-arguments have proper structure"""
+        agent = DevilsAdvocateAgent(config)
+
+        arguments = agent._generate_counterarguments("TEST", clean_dqa_output, clean_va_output)
+
+        for arg in arguments:
+            # Check all required fields are present
+            assert hasattr(arg, "severity")
+            assert arg.severity in ["A", "B", "C"]
+            assert hasattr(arg, "category")
+            assert len(arg.category) > 0
+            assert hasattr(arg, "claim")
+            assert len(arg.claim) > 10  # Meaningful claim
+            assert hasattr(arg, "evidence")
+            assert len(arg.evidence) > 0
+            assert hasattr(arg, "impact")
+            assert len(arg.impact) > 0
