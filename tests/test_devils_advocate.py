@@ -392,3 +392,133 @@ class TestCounterArguments:
             assert len(arg.evidence) > 0
             assert hasattr(arg, "impact")
             assert len(arg.impact) > 0
+
+
+class TestDAIntegration:
+    """Test full DA analysis pipeline"""
+
+    def test_clean_company_proceed(self, config, clean_dqa_output, clean_va_output):
+        """Test DA analysis of clean company → PROCEED"""
+        agent = DevilsAdvocateAgent(config)
+
+        result = agent.analyze("GOOD", clean_dqa_output, clean_va_output)
+
+        # Should not veto
+        assert result.veto is False
+        assert result.veto_reason is None
+
+        # Should have minimal concerns
+        a_level_args = [arg for arg in result.counterarguments if arg.severity == "A"]
+        assert len(a_level_args) == 0
+
+        # Should recommend PROCEED
+        assert result.final_recommendation == "PROCEED"
+
+        # Should have complete output
+        assert result.ticker == "GOOD"
+        assert isinstance(result.counterarguments, list)
+        assert isinstance(result.required_adjustments, list)
+        assert isinstance(result.stress_test_results, dict)
+
+    def test_veto_triggers_reject(self, config, clean_va_output):
+        """Test DA analysis with veto trigger → REJECT"""
+        agent = DevilsAdvocateAgent(config)
+
+        bad_dqa = DataQualityOutput(
+            ticker="BAD",
+            roic=0.15,
+            roe=0.20,
+            margin_stability=0.05,
+            moat_score=30,  # Veto trigger!
+            data_warnings=[],
+            beneish_m_score=-2.5,
+            cfo_ni_ratio=1.0
+        )
+
+        result = agent.analyze("BAD", bad_dqa, clean_va_output)
+
+        # Should veto
+        assert result.veto is True
+        assert result.veto_reason is not None
+
+        # Should recommend REJECT
+        assert result.final_recommendation == "REJECT"
+
+    def test_multiple_a_level_concerns_reject(self, config):
+        """Test DA analysis with multiple A-level concerns → REJECT"""
+        agent = DevilsAdvocateAgent(config)
+
+        bad_dqa = DataQualityOutput(
+            ticker="TERRIBLE",
+            roic=0.05,  # A-level concern
+            roe=0.07,  # A-level concern
+            margin_stability=0.05,
+            moat_score=65,  # OK
+            data_warnings=[],
+            beneish_m_score=-2.5,
+            cfo_ni_ratio=1.0
+        )
+
+        bad_va = ValuationOutput(
+            ticker="TERRIBLE",
+            owner_earnings=10000000,
+            intrinsic_value_base=150,
+            intrinsic_value_low=120,
+            intrinsic_value_high=180,
+            current_price=100,
+            margin_of_safety=0.33,  # OK
+            dcf_assumptions={}
+        )
+
+        result = agent.analyze("TERRIBLE", bad_dqa, bad_va)
+
+        # Should have multiple A-level concerns
+        a_level_args = [arg for arg in result.counterarguments if arg.severity == "A"]
+        assert len(a_level_args) >= 2
+
+        # Should recommend REJECT (≥2 A-level concerns)
+        assert result.final_recommendation == "REJECT"
+
+    def test_multiple_b_level_concerns_reduce(self, config):
+        """Test DA analysis with multiple B-level concerns → REDUCE"""
+        agent = DevilsAdvocateAgent(config)
+
+        marginal_dqa = DataQualityOutput(
+            ticker="MARGINAL",
+            roic=0.10,  # B-level concern (< 0.12)
+            roe=0.13,  # B-level concern (< 0.15)
+            margin_stability=0.12,  # B-level concern (> 0.10)
+            moat_score=65,  # OK
+            data_warnings=[],
+            beneish_m_score=-2.5,
+            cfo_ni_ratio=1.0
+        )
+
+        marginal_va = ValuationOutput(
+            ticker="MARGINAL",
+            owner_earnings=10000000,
+            intrinsic_value_base=125,
+            intrinsic_value_low=110,
+            intrinsic_value_high=140,
+            current_price=100,
+            margin_of_safety=0.20,  # B-level concern (< 0.30)
+            dcf_assumptions={}
+        )
+
+        result = agent.analyze("MARGINAL", marginal_dqa, marginal_va)
+
+        # Should have multiple B-level concerns
+        b_level_args = [arg for arg in result.counterarguments if arg.severity == "B"]
+        assert len(b_level_args) >= 3
+
+        # Should recommend REDUCE (≥3 B-level concerns)
+        assert result.final_recommendation == "REDUCE"
+
+    def test_recommendation_logic(self, config, clean_dqa_output, clean_va_output):
+        """Test recommendation decision logic"""
+        agent = DevilsAdvocateAgent(config)
+
+        result = agent.analyze("TEST", clean_dqa_output, clean_va_output)
+
+        # Recommendation should be one of the three
+        assert result.final_recommendation in ["REJECT", "REDUCE", "PROCEED"]

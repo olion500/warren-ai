@@ -63,13 +63,30 @@ class DevilsAdvocateAgent:
         Returns:
             DevilsAdvocateOutput with veto decision and counter-arguments
         """
-        # TODO: Check veto rules
-        # TODO: Generate counter-arguments
-        # TODO: Run stress tests
-        # TODO: Recommend assumption adjustments
-        # TODO: Make final recommendation
+        # Step 1: Check veto rules
+        veto, veto_reason = self._check_veto_rules(dqa_output, va_output)
 
-        raise NotImplementedError("Devil's Advocate analysis not yet implemented")
+        # Step 2: Generate counter-arguments
+        counterarguments = self._generate_counterarguments(ticker, dqa_output, va_output)
+
+        # Step 3: Run stress tests (TODO: implement full stress testing)
+        stress_test_results = {}  # Placeholder for now
+
+        # Step 4: Recommend assumption adjustments (TODO: implement)
+        required_adjustments = []  # Placeholder for now
+
+        # Step 5: Make final recommendation
+        final_recommendation = self._make_recommendation(veto, counterarguments, stress_test_results)
+
+        return DevilsAdvocateOutput(
+            ticker=ticker,
+            veto=veto,
+            veto_reason=veto_reason,
+            counterarguments=counterarguments,
+            required_adjustments=required_adjustments,
+            stress_test_results=stress_test_results,
+            final_recommendation=final_recommendation
+        )
 
     def _check_veto_rules(
         self,
@@ -320,22 +337,32 @@ class DevilsAdvocateAgent:
         Final recommendation: REJECT, REDUCE, or PROCEED
 
         Logic:
-        - REJECT: Veto triggered or >2 A-level concerns
-        - REDUCE: Multiple B-level concerns or stress tests fail
+        - REJECT: Veto triggered OR ≥2 A-level concerns
+        - REDUCE: ≥3 B-level concerns OR stress tests fail significantly
         - PROCEED: Concerns are manageable
         """
+        # Rule 1: Veto triggers automatic rejection
         if veto:
             return "REJECT"
 
+        # Rule 2: Multiple A-level concerns = REJECT
         a_level_count = sum(1 for arg in counterarguments if arg.severity == "A")
         if a_level_count >= 2:
             return "REJECT"
 
+        # Rule 3: Multiple B-level concerns = REDUCE
         b_level_count = sum(1 for arg in counterarguments if arg.severity == "B")
         if b_level_count >= 3:
             return "REDUCE"
 
-        # TODO: Check stress test results
-        # TODO: Apply decision logic
+        # Rule 4: Stress test failures (TODO: implement when stress tests ready)
+        # For now, if stress_results has 'failed' key, consider it
+        if stress_results.get("failed", False):
+            return "REDUCE"
 
+        # Rule 5: Single A-level concern = REDUCE (to be conservative)
+        if a_level_count == 1:
+            return "REDUCE"
+
+        # Otherwise: Concerns are manageable
         return "PROCEED"
